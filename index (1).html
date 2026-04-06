@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMM — Cold Call Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════ */
+:root {
+  --bg:       #0c0e14;
+  --bg2:      #13151f;
+  --bg3:      #1a1d2a;
+  --bg4:      #222538;
+  --border:   rgba(255,255,255,0.06);
+  --border2:  rgba(255,255,255,0.12);
+  --border3:  rgba(255,255,255,0.20);
+  --gold:     #f0c040;
+  --gold2:    #d4a020;
+  --goldbg:   rgba(240,192,64,0.10);
+  --goldbr:   rgba(240,192,64,0.25);
+  --text:     #eeeef0;
+  --text2:    #7e8099;
+  --text3:    #3e4055;
+  --danger:   #ff5757;
+  --dangerbg: rgba(255,87,87,0.10);
+  --success:  #4ade80;
+  --successbg:rgba(74,222,128,0.10);
+  --warn:     #fb923c;
+  --warnbg:   rgba(251,146,60,0.10);
+  --blue:     #60a5fa;
+  --bluebg:   rgba(96,165,250,0.10);
+  --r:        14px;
+  --rs:       8px;
+  --rm:       10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;overflow:hidden;}
+
+/* ═══════════════════════════════════════
+   GRID BACKGROUND
+═══════════════════════════════════════ */
+body::before {
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 0%,black 30%,transparent 100%);
+}
+
+/* ═══════════════════════════════════════
+   APP SHELL
+═══════════════════════════════════════ */
+#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;}
+
+/* ── TOP NAV ── */
+nav {
+  display:flex;align-items:center;gap:0;
+  padding:0 2rem;height:56px;
+  background:rgba(13,15,20,0.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.nav-brand{display:flex;align-items:center;gap:10px;margin-right:2rem;}
+.nav-logo{
+  width:30px;height:30px;border-radius:8px;background:var(--gold);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.nav-logo svg{width:14px;height:14px;}
+.nav-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:-.01em;}
+.nav-links{display:flex;align-items:center;gap:2px;flex:1;}
+.nav-link{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:var(--rs);
+  font-size:13px;font-weight:500;color:var(--text2);
+  cursor:pointer;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;transition:all .15s;
+  position:relative;
+}
+.nav-link:hover{color:var(--text);background:var(--bg3);}
+.nav-link.active{color:var(--text);}
+.nav-link.active::after{
+  content:'';position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);
+  width:24px;height:2px;background:var(--gold);border-radius:1px;
+}
+.nav-link svg{width:14px;height:14px;}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.pro-badge{
+  background:var(--gold);color:#1a0e00;
+  font-size:10px;font-weight:700;font-family:'DM Mono',monospace;
+  padding:2px 7px;border-radius:20px;letter-spacing:.05em;
+}
+.user-btn{
+  width:32px;height:32px;border-radius:50%;background:var(--gold);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#1a0e00;cursor:pointer;border:none;
+  font-family:'Syne',sans-serif;
+}
+
+/* ── PAGES ── */
+.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;}
+.page.active{display:block;}
+.page::-webkit-scrollbar{width:4px;}
+.page::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ═══════════════════════════════════════
+   DASHBOARD PAGE
+═══════════════════════════════════════ */
+#page-dashboard{padding:2rem;}
+
+.dash-hero{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:2rem;
+}
+.dash-greeting{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;}
+.dash-greeting span{color:var(--gold);}
+.dash-sub{font-size:13px;color:var(--text2);margin-top:4px;}
+.start-practice-btn{
+  background:var(--gold);color:#1a0e00;
+  border:none;border-radius:var(--rm);
+  padding:10px 20px;font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:all .15s;white-space:nowrap;
+}
+.start-practice-btn:hover{background:var(--gold2);transform:translateY(-1px);}
+.start-practice-btn:active{transform:translateY(0);}
+
+/* Stats row */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem;}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1.1rem 1.25rem;
+}
+.stat-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.stat-label svg{width:12px;height:12px;color:var(--text3);}
+.stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1;}
+.stat-unit{font-size:13px;font-weight:400;color:var(--text2);margin-left:4px;font-family:'DM Sans',sans-serif;}
+
+/* Mid row */
+.dash-mid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem;}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:1rem;display:flex;align-items:center;gap:8px;}
+.card-title svg{width:14px;height:14px;}
+
+/* Skill breakdown */
+.skill-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.skill-name{font-size:12px;color:var(--text2);width:130px;flex-shrink:0;}
+.skill-bar-wrap{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;}
+.skill-bar{height:100%;border-radius:3px;background:var(--gold);transition:width .6s ease;}
+.skill-pct{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);width:32px;text-align:right;}
+
+/* Leaderboard */
+.lb-tabs{display:flex;gap:4px;margin-bottom:1rem;}
+.lb-tab{
+  padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  cursor:pointer;border:1px solid transparent;background:transparent;
+  color:var(--text3);font-family:'DM Sans',sans-serif;transition:all .15s;
+}
+.lb-tab.active{background:var(--bg4);border-color:var(--border2);color:var(--text);}
+.lb-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px solid var(--border);
+}
+.lb-row:last-child{border-bottom:none;}
+.lb-rank{font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);width:20px;}
+.lb-rank.gold{color:var(--gold);}
+.lb-rank.silver{color:#aaa;}
+.lb-rank.bronze{color:#cd7f32;}
+.lb-name{flex:1;font-size:13px;}
+.lb-pts{font-size:12px;font-family:'DM Mono',monospace;color:var(--gold);}
+
+/* Score trend */
+.trend-card{margin-bottom:1.5rem;}
+.trend-chart{height:120px;position:relative;}
+.trend-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:13px;color:var(--text3);}
+
+/* Recent sessions */
+.sessions-card{}
+.session-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.session-row:last-child{border-bottom:none;}
+.session-av{
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;flex-shrink:0;
+}
+.session-info{flex:1;}
+.session-name{font-size:13px;font-weight:500;}
+.session-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.session-score{
+  font-family:'DM Mono',monospace;font-size:13px;font-weight:500;
+}
+.score-high{color:var(--success);}
+.score-mid{color:var(--warn);}
+.score-low{color:var(--danger);}
+.session-outcome{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
+.outcome-win{background:var(--successbg);color:var(--success);}
+.outcome-loss{background:var(--dangerbg);color:var(--danger);}
+
+/* ═══════════════════════════════════════
+   PRACTICE PAGE
+═══════════════════════════════════════ */
+#page-practice{padding:2rem;}
+
+.practice-header{margin-bottom:1.5rem;}
+.practice-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em;}
+.practice-sub{font-size:13px;color:var(--text2);margin-top:4px;}
+
+/* ICP setup banner */
+.icp-banner{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1rem 1.25rem;
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:1.5rem;
+}
+.icp-icon{font-size:20px;}
+.icp-text{flex:1;}
+.icp-label{font-size:13px;font-weight:500;}
+.icp-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.icp-actions{display:flex;align-items:center;gap:8px;}
+.icp-input{
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:var(--rs);padding:7px 12px;
+  color:var(--text);font-family:'DM Sans',sans-serif;
+  font-size:13px;outline:none;width:220px;transition:border-color .15s;
+}
+.icp-input:focus{border-color:var(--border3);}
+.icp-input::placeholder{color:var(--text3);}
+.btn-scan{
+  background:var(--gold);color:#1a0e00;border:none;
+  border-radius:var(--rs);padding:7px 14px;
+  font-size:12px;font-weight:700;font-family:'Syne',sans-serif;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.btn-scan:hover{background:var(--gold2);}
+.icp-skip{font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.icp-skip:hover{color:var(--text2);}
+
+/* Points bar */
+.points-bar{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--rm);padding:10px 1.25rem;
+  display:flex;align-items:center;justify-content:center;gap:2rem;
+  margin-bottom:1.5rem;font-size:13px;color:var(--text2);
+}
+.pts-item{display:flex;align-items:center;gap:6px;}
+.pts-val{color:var(--gold);font-weight:600;font-family:'DM Mono',monospace;}
+
+/* Persona grid */
+.persona-section-title{
+  font-size:11px;font-weight:600;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.12em;
+  margin-bottom:10px;
+}
+.persona-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  margin-bottom:1.5rem;
+}
+.persona-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1rem;cursor:pointer;
+  transition:all .15s;position:relative;overflow:hidden;
+}
+.persona-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+.persona-card.selected{border-color:var(--goldbr);background:rgba(240,192,64,0.04);}
+.persona-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 60%);
+  pointer-events:none;
+}
+.pc-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.pc-avatar{
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;flex-shrink:0;
+  border:2px solid rgba(255,255,255,0.1);
+}
+.pc-info{}
+.pc-name{font-size:13px;font-weight:600;}
+.pc-role{font-size:11px;color:var(--text2);margin-top:1px;}
+.pc-quote{font-size:11px;color:var(--text3);font-style:italic;margin-bottom:8px;line-height:1.4;}
+.pc-footer{display:flex;align-items:center;justify-content:space-between;}
+.pc-diff{font-size:10px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:.05em;}
+.diff-easy{color:var(--success);}
+.diff-med{color:var(--warn);}
+.diff-hard{color:var(--danger);}
+.diff-real{color:var(--blue);}
+.diff-gate{color:#c084fc;}
+.pc-win{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;}
+
+/* Gatekeeper section */
+.gk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+
+/* Practice chat overlay */
+.practice-overlay{
+  display:none;position:fixed;inset:0;z-index:100;
+  background:var(--bg);flex-direction:column;
+}
+.practice-overlay.open{display:flex;}
+.po-header{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 1.5rem;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;
+}
+.po-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.po-name{font-size:15px;font-weight:600;}
+.po-detail{font-size:11px;color:var(--text3);margin-top:1px;}
+.po-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.po-score-live{
+  font-family:'DM Mono',monospace;font-size:13px;
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:var(--rs);padding:4px 12px;
+}
+.live-pill{display:flex;align-items:center;gap:5px;font-size:11px;font-family:'DM Mono',monospace;color:var(--success);background:var(--successbg);padding:4px 10px;border-radius:20px;border:1px solid rgba(74,222,128,0.2);}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.po-end{background:transparent;border:1px solid rgba(255,87,87,.3);color:var(--danger);border-radius:var(--rs);padding:6px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;}
+.po-end:hover{background:var(--dangerbg);}
+
+.po-messages{flex:1;overflow-y:auto;padding:1.5rem;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;}
+.po-messages::-webkit-scrollbar{width:3px;}
+.po-messages::-webkit-scrollbar-thumb{background:var(--border2);}
+.sys-msg{text-align:center;font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;padding:3px 0;}
+.msg{display:flex;gap:10px;}
+.msg.ai{max-width:70%;}
+.msg.user{max-width:65%;align-self:flex-end;flex-direction:row-reverse;}
+.m-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0;margin-top:2px;}
+.m-av.user-av{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.bubble{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.6;}
+.msg.ai .bubble{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px;}
+.msg.user .bubble{background:var(--gold);color:#1a0e00;border-bottom-right-radius:3px;}
+.typing-wrap{display:none;}
+.typing-wrap.on{display:flex;}
+.typing-wrap{gap:10px;align-items:center;}
+.typing-bubbles{display:flex;align-items:center;gap:4px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:3px;}
+.typing-bubbles span{width:5px;height:5px;border-radius:50%;background:var(--text3);animation:tb 1.3s infinite;}
+.typing-bubbles span:nth-child(2){animation-delay:.18s;}
+.typing-bubbles span:nth-child(3){animation-delay:.36s;}
+@keyframes tb{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+
+/* Results panel */
+.results-panel{
+  display:none;margin:1rem 1.5rem;
+  background:var(--bg2);border:1px solid var(--goldbr);
+  border-radius:var(--r);padding:1.25rem;
+}
+.results-panel.on{display:block;}
+.rp-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:8px;}
+.rp-scores{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+.rp-score{background:var(--bg3);border-radius:var(--rs);padding:10px;text-align:center;}
+.rp-score-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--gold);}
+.rp-score-label{font-size:10px;color:var(--text3);margin-top:2px;}
+.rp-body{font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;}
+
+.po-input-area{
+  display:flex;flex-direction:column;gap:10px;
+  padding:1rem 1.5rem 1.5rem;border-top:1px solid var(--border);flex-shrink:0;
+}
+.voice-status{display:flex;align-items:center;gap:10px;min-height:28px;}
+.vs-label{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;}
+.vs-transcript{font-size:13px;color:var(--text2);font-style:italic;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.wave{display:none;align-items:flex-end;gap:2px;height:16px;}
+.wave.on{display:flex;}
+.wave-bar{width:3px;border-radius:2px;background:var(--gold);animation:wave-anim 0.8s ease-in-out infinite;}
+.wave-bar:nth-child(1){height:4px;animation-delay:0s;}
+.wave-bar:nth-child(2){height:9px;animation-delay:.1s;}
+.wave-bar:nth-child(3){height:14px;animation-delay:.2s;}
+.wave-bar:nth-child(4){height:9px;animation-delay:.3s;}
+.wave-bar:nth-child(5){height:5px;animation-delay:.4s;}
+.wave-bar:nth-child(6){height:11px;animation-delay:.15s;}
+.wave-bar:nth-child(7){height:7px;animation-delay:.25s;}
+@keyframes wave-anim{0%,100%{opacity:.4;transform:scaleY(1)}50%{opacity:1;transform:scaleY(1.4)}}
+.speaking-overlay{
+  display:none;position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
+  background:var(--bg2);border:1px solid var(--border2);border-radius:24px;
+  padding:6px 16px;font-size:11px;color:var(--text2);
+  align-items:center;gap:8px;font-family:'DM Mono',monospace;z-index:10;
+}
+.speaking-overlay.on{display:flex;}
+.po-row{display:flex;gap:8px;align-items:flex-end;}
+.po-textarea{
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 14px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;
+  resize:none;outline:none;min-height:44px;max-height:110px;
+  transition:border-color .15s;
+}
+.po-textarea:focus{border-color:var(--border2);}
+.po-textarea::placeholder{color:var(--text3);}
+.mic-btn{
+  width:44px;height:44px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--bg3);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;flex-shrink:0;
+}
+.mic-btn:hover{border-color:var(--gold);background:var(--goldbg);}
+.mic-btn.recording{background:var(--dangerbg);border-color:rgba(255,87,87,.4);animation:mic-pulse 1s ease-in-out infinite;}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,87,87,.3)}50%{box-shadow:0 0 0 6px rgba(255,87,87,0)}}
+.mic-btn svg{width:16px;height:16px;}
+.send-btn{width:44px;height:44px;border-radius:var(--rm);background:var(--gold);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.send-btn:hover{background:var(--gold2);}
+.send-btn:active{transform:scale(.96);}
+.send-btn:disabled{opacity:.25;cursor:not-allowed;}
+.send-btn svg{width:15px;height:15px;}
+.po-toolbar{display:flex;gap:6px;flex-wrap:wrap;}
+.tool-btn{background:transparent;border:1px solid var(--border);border-radius:var(--rs);padding:5px 12px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .15s;}
+.tool-btn:hover{background:var(--bg3);border-color:var(--border2);color:var(--text);}
+.tool-btn.gold-tool{border-color:var(--goldbr);color:var(--gold);}
+.tool-btn.gold-tool:hover{background:var(--goldbg);}
+
+/* ═══════════════════════════════════════
+   COACH PAGE
+═══════════════════════════════════════ */
+#page-coach{padding:2rem;}
+.coach-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px;}
+.coach-sub{font-size:13px;color:var(--text2);margin-bottom:2rem;}
+
+.coach-grid{display:grid;grid-template-columns:280px 1fr;gap:16px;}
+.coach-nav-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;height:fit-content;position:sticky;top:0;}
+.coach-nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:var(--rs);
+  cursor:pointer;font-size:13px;color:var(--text2);
+  transition:all .15s;border:1px solid transparent;
+}
+.coach-nav-item:hover{background:var(--bg3);color:var(--text);}
+.coach-nav-item.active{background:var(--goldbg);border-color:var(--goldbr);color:var(--gold);}
+.coach-nav-icon{font-size:14px;width:20px;text-align:center;}
+.coach-content{}
+.coach-section{display:none;}
+.coach-section.active{display:block;}
+.coach-section-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:1rem;}
+
+/* Script cards */
+.script-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1.25rem;margin-bottom:12px;
+}
+.script-card-title{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.script-card-sub{font-size:12px;color:var(--text2);margin-bottom:12px;}
+.script-steps{}
+.script-step{
+  display:flex;gap:12px;margin-bottom:12px;
+}
+.step-num{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--goldbg);border:1px solid var(--goldbr);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:var(--gold);
+  flex-shrink:0;margin-top:2px;font-family:'DM Mono',monospace;
+}
+.step-body{}
+.step-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+.step-text{font-size:12px;color:var(--text2);line-height:1.6;}
+.step-example{
+  margin-top:6px;padding:8px 12px;
+  background:var(--bg3);border-left:2px solid var(--gold);
+  border-radius:0 var(--rs) var(--rs) 0;
+  font-size:12px;color:var(--text2);font-style:italic;
+  line-height:1.5;
+}
+
+/* Objection cards */
+.obj-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:8px;
+}
+.obj-trigger{font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px;}
+.obj-response{font-size:13px;color:var(--text2);line-height:1.6;}
+.obj-tag{
+  display:inline-block;font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:20px;margin-bottom:6px;
+  background:var(--dangerbg);color:var(--danger);font-family:'DM Mono',monospace;
+}
+
+/* Tip cards */
+.tip-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:8px;
+  display:flex;gap:12px;align-items:flex-start;
+}
+.tip-icon{font-size:18px;flex-shrink:0;margin-top:2px;}
+.tip-title{font-size:13px;font-weight:600;margin-bottom:4px;}
+.tip-text{font-size:12px;color:var(--text2);line-height:1.6;}
+
+/* ═══════════════════════════════════════
+   LOGIN / ADMIN
+═══════════════════════════════════════ */
+#page-login{
+  display:flex;align-items:center;justify-content:center;
+  padding:2rem;min-height:calc(100vh - 56px);
+}
+.login-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);padding:2rem;width:100%;max-width:380px;
+  text-align:center;
+}
+.login-icon{font-size:32px;margin-bottom:1rem;}
+.login-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem;}
+.login-field{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--rs);padding:10px 14px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;outline:none;
+  margin-bottom:10px;transition:border-color .15s;text-align:left;
+}
+.login-field:focus{border-color:var(--border2);}
+.login-field::placeholder{color:var(--text3);}
+.login-btn{
+  width:100%;background:var(--gold);color:#1a0e00;border:none;
+  border-radius:var(--rs);padding:11px;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;
+  margin-top:4px;
+}
+.login-btn:hover{background:var(--gold2);}
+.login-err{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+.login-err.on{display:block;}
+
+#page-admin{padding:2rem;}
+.admin-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;}
+.admin-sub{font-size:13px;color:var(--text2);margin-bottom:2rem;}
+.admin-grid{display:grid;grid-template-columns:220px 1fr;gap:16px;}
+.admin-nav{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;height:fit-content;}
+.admin-nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--rs);
+  cursor:pointer;font-size:13px;color:var(--text2);
+  transition:all .15s;border:1px solid transparent;margin-bottom:2px;
+}
+.admin-nav-item:hover{background:var(--bg3);color:var(--text);}
+.admin-nav-item.active{background:var(--goldbg);border-color:var(--goldbr);color:var(--gold);}
+.admin-panel{display:none;}
+.admin-panel.active{display:block;}
+.admin-panel-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:1rem;}
+
+/* Form elements */
+.form-group{margin-bottom:1rem;}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.08em;}
+.form-input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--rs);padding:9px 12px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .15s;
+}
+.form-input:focus{border-color:var(--border2);}
+.form-input::placeholder{color:var(--text3);}
+.form-textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--rs);padding:9px 12px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;outline:none;
+  resize:vertical;min-height:90px;transition:border-color .15s;line-height:1.6;
+}
+.form-textarea:focus{border-color:var(--border2);}
+.form-select{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--rs);padding:9px 12px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;outline:none;
+  appearance:none;cursor:pointer;
+}
+.save-btn{
+  background:var(--gold);color:#1a0e00;border:none;border-radius:var(--rs);
+  padding:9px 20px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+}
+.save-btn:hover{background:var(--gold2);}
+.save-confirm{font-size:12px;color:var(--success);display:none;margin-left:10px;}
+.save-confirm.on{display:inline;}
+
+/* Settings card */
+.settings-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:12px;}
+.settings-card-title{font-size:13px;font-weight:600;margin-bottom:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;}
+
+/* Tags input */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.tag{
+  display:flex;align-items:center;gap:5px;
+  background:var(--bg4);border:1px solid var(--border2);
+  border-radius:20px;padding:3px 10px;font-size:12px;
+}
+.tag-remove{cursor:pointer;color:var(--text3);font-size:14px;line-height:1;}
+.tag-remove:hover{color:var(--danger);}
+
+/* User table */
+.user-table{width:100%;border-collapse:collapse;}
+.user-table th{text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:8px 12px;border-bottom:1px solid var(--border);}
+.user-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;}
+.user-table tr:last-child td{border-bottom:none;}
+.user-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;font-family:'DM Mono',monospace;}
+.badge-admin{background:var(--goldbg);color:var(--gold);}
+.badge-user{background:var(--bg4);color:var(--text2);}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-label{font-size:13px;}
+.toggle-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.toggle{
+  width:40px;height:22px;border-radius:11px;background:var(--bg4);
+  position:relative;cursor:pointer;border:1px solid var(--border2);
+  transition:background .2s;flex-shrink:0;
+}
+.toggle.on{background:var(--gold);border-color:var(--gold);}
+.toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;background:#fff;
+  transition:transform .2s;
+}
+.toggle.on::after{transform:translateX(18px);}
+
+/* Range */
+.range-row{display:flex;align-items:center;gap:12px;}
+.range-input{flex:1;accent-color:var(--gold);}
+.range-val{font-size:12px;font-family:'DM Mono',monospace;color:var(--gold);min-width:32px;text-align:right;}
+
+/* ── SHARED UTILS ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem;text-align:center;gap:8px;}
+.empty-icon{font-size:28px;opacity:.4;}
+.empty-label{font-size:13px;color:var(--text3);}
+.divider{height:1px;background:var(--border);margin:1rem 0;}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;font-family:'DM Mono',monospace;}
+.badge-success{background:var(--successbg);color:var(--success);}
+.badge-warn{background:var(--warnbg);color:var(--warn);}
+.badge-danger{background:var(--dangerbg);color:var(--danger);}
+.badge-blue{background:var(--bluebg);color:var(--blue);}
+
+@media(max-width:900px){
+  .stat-grid{grid-template-columns:repeat(2,1fr);}
+  .persona-grid{grid-template-columns:repeat(2,1fr);}
+  .coach-grid,.admin-grid{grid-template-columns:1fr;}
+  .rp-scores{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 14 14" fill="none"><path d="M2 2h10v10H2z" rx="2" fill="#1a0e00"/><path d="M5 5l5 2.5L5 10V5z" fill="#1a0e00"/><rect x="1" y="1" width="12" height="12" rx="2.5" stroke="#1a0e00" stroke-width="1.2" fill="none"/></svg>
+    </div>
+    <span class="nav-name">HMM Trainer</span>
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="goTo('dashboard')" id="nl-dashboard">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-link" onclick="goTo('practice')" id="nl-practice">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1a6 6 0 1 0 0 12A6 6 0 0 0 7 1z"/><path d="M5.5 5l4 2-4 2V5z" fill="currentColor" stroke="none"/></svg>
+      Practice
+    </button>
+    <button class="nav-link" onclick="goTo('coach')" id="nl-coach">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1a3 3 0 1 1 0 6A3 3 0 0 1 7 1z"/><path d="M1 13c0-2.8 2.7-5 6-5s6 2.2 6 5" stroke-linecap="round"/></svg>
+      Coach
+    </button>
+    <button class="nav-link" onclick="goTo('admin-gate')" id="nl-admin">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="6" width="10" height="7" rx="1.5"/><path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2" stroke-linecap="round"/></svg>
+      Admin
+    </button>
+  </div>
+  <div class="nav-right">
+    <span class="pro-badge">PRO</span>
+    <button class="user-btn" id="user-btn">M</button>
+  </div>
+</nav>
+
+<!-- ═══ PAGES ═══ -->
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div style="padding:2rem;">
+    <div class="dash-hero">
+      <div>
+        <div class="dash-greeting">Goedemiddag, <span id="dash-username">Mats</span></div>
+        <div class="dash-sub">Klaar voor je volgende training? Elke rep telt.</div>
+      </div>
+      <button class="start-practice-btn" onclick="goTo('practice')">
+        Start Practice →
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 1v4l2 2" stroke-linecap="round"/><circle cx="6" cy="6" r="5"/></svg>
+          Streak
+        </div>
+        <div class="stat-val" id="stat-streak">0<span class="stat-unit">dagen</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="10" height="8" rx="1"/><path d="M4 1v2M8 1v2M1 5h10"/></svg>
+          Afspraken
+        </div>
+        <div class="stat-val" id="stat-meetings">0<span class="stat-unit">geboekt</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 1l1.2 3.6H11L8.4 6.8 9.6 11 6 8.8 2.4 11l1.2-4.2L1 4.6h3.8L6 1z"/></svg>
+          Beste score
+        </div>
+        <div class="stat-val" id="stat-best">—<span class="stat-unit">/10</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 10l3-4 3 2 4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Deze week
+        </div>
+        <div class="stat-val" id="stat-week">0<span class="stat-unit">sessies</span></div>
+      </div>
+    </div>
+
+    <!-- Mid row -->
+    <div class="dash-mid">
+      <!-- Skill breakdown -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1l1.5 4H13L9.5 7.5 11 12 7 9.5 3 12l1.5-4.5L1 5h4.5L7 1z"/></svg>
+          Skill Breakdown
+        </div>
+        <div id="skill-breakdown">
+          <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-label">Voltooi een sessie om je skills te zien</div></div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1l1.5 4H13L9.5 7.5 11 12 7 9.5 3 12l1.5-4.5L1 5h4.5L7 1z"/></svg>
+          Leaderboard
+        </div>
+        <div class="lb-tabs">
+          <button class="lb-tab active" onclick="lbTab('week',this)">Week</button>
+          <button class="lb-tab" onclick="lbTab('month',this)">Maand</button>
+          <button class="lb-tab" onclick="lbTab('all',this)">Alles</button>
+        </div>
+        <div id="lb-body"></div>
+      </div>
+    </div>
+
+    <!-- Score trend -->
+    <div class="card trend-card">
+      <div class="card-title">Score Trend</div>
+      <div class="trend-chart" id="trend-chart">
+        <div class="trend-empty">Voltooi een sessie om je trend te zien</div>
+      </div>
+    </div>
+
+    <!-- Recent sessions -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="6"/><path d="M7 4v3.5l2 2" stroke-linecap="round"/></svg>
+        Recente Sessies
+      </div>
+      <div id="recent-sessions">
+        <div class="empty-state">
+          <div class="empty-icon">🎙️</div>
+          <div class="empty-label">Nog geen sessies. Start je eerste practice!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRACTICE -->
+<div class="page" id="page-practice">
+  <div style="padding:2rem;">
+    <div class="practice-header">
+      <div class="practice-title">Practice Arena</div>
+      <div class="practice-sub">Kies een prospect en oefen je cold call. Elke sessie telt mee voor je leaderboard score.</div>
+    </div>
+
+    <!-- ICP banner -->
+    <div class="icp-banner" id="icp-banner">
+      <div class="icp-icon">🎯</div>
+      <div class="icp-text">
+        <div class="icp-label">AI-Powered ICP Setup</div>
+        <div class="icp-sub">Voer je website in en we detecteren automatisch je ideale prospect</div>
+      </div>
+      <div class="icp-actions">
+        <input class="icp-input" id="icp-url" placeholder="e.g. hmm.nl" />
+        <button class="btn-scan" onclick="scanICP()">🔍 Scan met AI</button>
+        <span class="icp-skip" onclick="skipICP()">Overslaan</span>
+      </div>
+    </div>
+
+    <!-- Points bar -->
+    <div class="points-bar">
+      <div class="pts-item"><span class="pts-val">+1 pt</span> per sessie</div>
+      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <div class="pts-item"><span class="pts-val">+5 pts</span> per geboekte afspraak</div>
+      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <div class="pts-item"><span class="pts-val">+2 pts</span> score ≥ 8/10</div>
+    </div>
+
+    <!-- Main personas -->
+    <div class="persona-section-title">Prospects</div>
+    <div class="persona-grid" id="persona-grid"></div>
+
+    <!-- Gatekeeper -->
+    <div class="persona-section-title" style="margin-top:.5rem;">
+      <svg style="width:12px;height:12px;vertical-align:middle;margin-right:4px;" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>
+      Gatekeeper Challenge
+    </div>
+    <div class="gk-grid" id="gk-grid"></div>
+  </div>
+</div>
+
+<!-- COACH -->
+<div class="page" id="page-coach">
+  <div style="padding:2rem;">
+    <div class="coach-title">Coach</div>
+    <div class="coach-sub">Scripts, technieken en bezwaar-training voor high-ticket B2B cold calls.</div>
+    <div class="coach-grid">
+      <div class="coach-nav-panel">
+        <div class="coach-nav-item active" onclick="coachNav('scripts',this)"><span class="coach-nav-icon">📋</span>HMM Scripts</div>
+        <div class="coach-nav-item" onclick="coachNav('objections',this)"><span class="coach-nav-icon">🛡</span>Bezwaren</div>
+        <div class="coach-nav-item" onclick="coachNav('openers',this)"><span class="coach-nav-icon">🗝</span>Openers</div>
+        <div class="coach-nav-item" onclick="coachNav('closing',this)"><span class="coach-nav-icon">✅</span>Afsluiten</div>
+        <div class="coach-nav-item" onclick="coachNav('tips',this)"><span class="coach-nav-icon">💡</span>Pro Tips</div>
+      </div>
+      <div class="coach-content">
+
+        <!-- Scripts -->
+        <div class="coach-section active" id="cs-scripts">
+          <div class="coach-section-title">HMM Cold Call Script</div>
+          <div class="script-card">
+            <div class="script-card-title">🚀 Standaard introductie (HMM)</div>
+            <div class="script-card-sub">Gebruik dit bij een volledig koud eerste contact met een B2B-beslisser.</div>
+            <div class="script-steps">
+              <div class="script-step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Opening & legitimatie</div><div class="step-text">Stel jezelf voor met naam én bedrijf. Geef direct context waarom je belt.</div><div class="step-example">"Goedemiddag, u spreekt met [naam] van HMM. Wij helpen B2B-bedrijven met complexe proposities om hun salespipeline structureel te vullen via outbound."</div></div></div>
+              <div class="script-step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Haakzin — relevantie aantonen</div><div class="step-text">Koppel direct aan een pijn of ambitie die waarschijnlijk relevant is.</div><div class="step-example">"De meeste [functietitel] die ik spreek geven aan dat nieuwe business te afhankelijk is van referrals of warm inbound. Herkent u dat?"</div></div></div>
+              <div class="script-step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Bevestiging vragen</div><div class="step-text">Laat de prospect bevestigen voor je verder gaat. Nooit monoloog.</div><div class="step-example">"Mag ik u één vraag stellen om te zien of dit relevant is voor uw situatie?"</div></div></div>
+              <div class="script-step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Waarde-statement</div><div class="step-text">Leg in één zin uit wat HMM doet en voor wie.</div><div class="step-example">"Wij realiseren kwalitatieve afspraken bij de juiste beslissers, zodat uw salesteam zich focust op sluiten — niet op prospecting."</div></div></div>
+              <div class="script-step"><div class="step-num">5</div><div class="step-body"><div class="step-title">Afspraak-vraag</div><div class="step-text">Vraag altijd om een concreet moment. Geef twee opties.</div><div class="step-example">"Zou donderdag of vrijdag van volgende week uitkomen voor een gesprek van 20 minuten?"</div></div></div>
+            </div>
+          </div>
+          <div class="script-card">
+            <div class="script-card-title">🔁 Follow-up script</div>
+            <div class="script-card-sub">Na eerder contact of een verzonden offerte.</div>
+            <div class="script-steps">
+              <div class="script-step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Referentie aan eerder contact</div><div class="step-text">Herinner aan het vorige gesprek zonder defensief te klinken.</div><div class="step-example">"We spraken twee weken geleden kort over uw pipeline-uitdagingen. Ik wilde checken of dat nog actueel is."</div></div></div>
+              <div class="script-step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Nieuwe trigger toevoegen</div><div class="step-text">Geef een reden waarom je nú belt — urgentie creëren.</div><div class="step-example">"We hebben net een klant in [sector] geholpen aan 12 extra afspraken in 6 weken — ik dacht direct aan uw situatie."</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Objections -->
+        <div class="coach-section" id="cs-objections">
+          <div class="coach-section-title">Bezwaren Handling</div>
+          <div class="obj-card"><div class="obj-tag">BEZWAAR</div><div class="obj-trigger">"Stuur maar gewoon een mail."</div><div class="obj-response">Dit is een afwijzing vermomd als verzoek. Reageer met: <em>"Dat doe ik graag — maar zodat ik de juiste info stuur: wat is momenteel uw grootste uitdaging rondom nieuwe business? Dan kan ik heel gericht zijn."</em></div></div>
+          <div class="obj-card"><div class="obj-tag">BEZWAAR</div><div class="obj-trigger">"We doen dit intern."</div><div class="obj-response">Valideer en stel dan de juiste vraag: <em>"Goed om te horen. Mag ik vragen hoeveel outbound afspraken dat momenteel per maand oplevert? Dan snap ik beter of we iets kunnen toevoegen."</em></div></div>
+          <div class="obj-card"><div class="obj-tag">BEZWAAR</div><div class="obj-trigger">"Te duur / geen budget."</div><div class="obj-response">Verschuif van prijs naar waarde: <em>"Volledig begrijpelijk. Stel dat we garanderen dat u X afspraken per maand krijgt bij gekwalificeerde beslissers — wat is één zo'n afspraak u waard in potentiële omzet?"</em></div></div>
+          <div class="obj-card"><div class="obj-tag">BEZWAAR</div><div class="obj-trigger">"Geen interesse" / direct ophangen.</div><div class="obj-response">Laatste kans: <em>"Dat begrijp ik. Eén vraag voor ik u laat gaan: als u uw pipeline volgend kwartaal met 30% zou kunnen laten groeien zonder extra inzet van uw team — zou dat de moeite waard zijn voor een gesprek van 15 minuten?"</em></div></div>
+          <div class="obj-card"><div class="obj-tag">BEZWAAR</div><div class="obj-trigger">"Bel later nog maar terug."</div><div class="obj-response">Zet een concreet moment: <em>"Natuurlijk. Wanneer zou een goed moment zijn — dan zet ik het direct in de agenda. Volgende week dinsdag of woensdag?"</em></div></div>
+        </div>
+
+        <!-- Openers -->
+        <div class="coach-section" id="cs-openers">
+          <div class="coach-section-title">Krachtige Openers</div>
+          <div class="tip-card"><div class="tip-icon">⚡</div><div><div class="tip-title">De pijn-opener</div><div class="tip-text">Begin met een pijn die de prospect herkent voordat je je bedrijf noemt. Mensen luisteren als ze zich herkend voelen, niet als ze een pitch horen.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">🔢</div><div><div class="tip-title">De getal-opener</div><div class="tip-text">Cijfers wekken nieuwsgierigheid. <em>"We hebben vorig kwartaal 14 afspraken gerealiseerd voor een IT-dienstverlener in 45 dagen. Mag ik u in 2 minuten uitleggen hoe?"</em></div></div></div>
+          <div class="tip-card"><div class="tip-icon">🎯</div><div><div class="tip-title">De naam-opener</div><div class="tip-text">Noem altijd de naam van de persoon aan het begin. Mensen reageren onmiddellijk op hun eigen naam — het verhoogt aandacht in de eerste 5 seconden.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">❓</div><div><div class="tip-title">De vraag-opener</div><div class="tip-text">Open met een vraag die ze bijna zeker met "ja" beantwoorden. <em>"Heeft u 30 seconden?"</em> of <em>"Heeft u ooit overwogen uw prospecting volledig uit te besteden?"</em></div></div></div>
+        </div>
+
+        <!-- Closing -->
+        <div class="coach-section" id="cs-closing">
+          <div class="coach-section-title">Afsluittechnieken</div>
+          <div class="script-card">
+            <div class="script-card-title">✅ De assumptieve sluiting</div>
+            <div class="script-card-sub">Ga ervan uit dat de prospect instemt en stel alleen een timing-vraag.</div>
+            <div class="step-example">"Dan plannen we donderdag 10:00 of vrijdag 14:00 — welk moment past u beter?"</div>
+          </div>
+          <div class="script-card">
+            <div class="script-card-title">📅 De urgentie-sluiting</div>
+            <div class="script-card-sub">Creëer een legitieme reden om nu te beslissen.</div>
+            <div class="step-example">"We starten volgende maand een nieuwe cohort — als u erbij wilt zijn, moet ik dit week een slot reserveren. Zal ik dat doen?"</div>
+          </div>
+          <div class="script-card">
+            <div class="script-card-title">🤝 De mini-ja sluiting</div>
+            <div class="script-card-sub">Bouw consensus op met kleine bevestigingen voor de grote vraag.</div>
+            <div class="step-example">"U gaf aan dat nieuwe business een prioriteit is dit kwartaal. En dat outbound interessant klinkt als het de juiste afspraken oplevert. Dan is het enige wat ons scheidt een kort gesprek — zullen we dat inplannen?"</div>
+          </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="coach-section" id="cs-tips">
+          <div class="coach-section-title">Pro Tips</div>
+          <div class="tip-card"><div class="tip-icon">🎙️</div><div><div class="tip-title">Spreeksnelheid</div><div class="tip-text">Spreek iets langzamer dan normaal. Haast = onzekerheid. Een rustige toon straalt autoriteit uit en geeft de prospect ruimte om te reageren.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">🤐</div><div><div class="tip-title">Stilte is je vriend</div><div class="tip-text">Na een sluitingsvraag: zwijg. Wie als eerste spreekt, verliest. Laat de stilte werken — de prospect vult hem in.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">🪞</div><div><div class="tip-title">Mirroring</div><div class="tip-text">Herhaal de laatste 2-3 woorden van wat de prospect zegt als vraag. Dit moedigt uitleg aan zonder zelf iets te zeggen.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">📝</div><div><div class="tip-title">Noteer alles</div><div class="tip-text">Maak aantekeningen tijdens het gesprek. Gebruik die bij de follow-up. Niets overtuigt meer dan laten zien dat je echt geluisterd hebt.</div></div></div>
+          <div class="tip-card"><div class="tip-icon">🔄</div><div><div class="tip-title">Kwalificeer snel</div><div class="tip-text">Besteed nooit meer dan 3 minuten aan een niet-gekwalificeerde prospect. Vraag vroeg naar budget, authority en timing.</div></div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div class="page" id="page-admin-gate">
+  <div id="page-login">
+    <div class="login-card">
+      <div class="login-icon">🔐</div>
+      <div class="login-title">Admin Toegang</div>
+      <div class="login-sub">Log in met je admin-account om instellingen te beheren.</div>
+      <input class="login-field" type="text" id="login-user" placeholder="Gebruikersnaam" />
+      <input class="login-field" type="password" id="login-pass" placeholder="Wachtwoord" onkeydown="if(event.key==='Enter')doLogin()" />
+      <button class="login-btn" onclick="doLogin()">Inloggen</button>
+      <div class="login-err" id="login-err">Onjuiste inloggegevens. Probeer opnieuw.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="page" id="page-admin">
+  <div style="padding:2rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
+      <div>
+        <div class="admin-title">Admin Panel</div>
+        <div class="admin-sub">Beheer kwalificaties, AI-instellingen en gebruikers.</div>
+      </div>
+      <button onclick="adminLogout()" style="background:transparent;border:1px solid var(--border);border-radius:var(--rs);padding:7px 14px;color:var(--text2);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">Uitloggen</button>
+    </div>
+    <div class="admin-grid">
+      <div class="admin-nav">
+        <div class="admin-nav-item active" onclick="adminNav('ai',this)">🤖 AI Instellingen</div>
+        <div class="admin-nav-item" onclick="adminNav('qualifiers',this)">✅ Kwalificaties</div>
+        <div class="admin-nav-item" onclick="adminNav('personas',this)">👥 Persona's</div>
+        <div class="admin-nav-item" onclick="adminNav('scoring',this)">⭐ Scoring</div>
+        <div class="admin-nav-item" onclick="adminNav('users',this)">👤 Gebruikers</div>
+      </div>
+      <div>
+        <!-- AI Settings -->
+        <div class="admin-panel active" id="ap-ai">
+          <div class="admin-panel-title">AI Instellingen</div>
+          <div class="settings-card">
+            <div class="settings-card-title">API Configuratie</div>
+            <div class="form-group">
+              <label class="form-label">Anthropic API-sleutel</label>
+              <input class="form-input" type="password" id="ai-apikey" placeholder="sk-ant-..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Proxy URL (optioneel)</label>
+              <input class="form-input" id="ai-proxy" placeholder="https://jouw-worker.workers.dev" />
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-title">Model & Gedrag</div>
+            <div class="form-group">
+              <label class="form-label">Model</label>
+              <select class="form-select" id="ai-model">
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (aanbevolen)</option>
+                <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (sneller/goedkoper)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Taalinstelling prospect</label>
+              <select class="form-select" id="ai-lang">
+                <option value="nl">Nederlands</option>
+                <option value="en">Engels</option>
+                <option value="both">Beide (gemix)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Systeem-instructie (prefix)</label>
+              <textarea class="form-textarea" id="ai-system" placeholder="Aanvullende instructies voor alle prospects...">Je bent een realistische B2B-prospect in een cold call training scenario voor HMM, een outbound leadgeneratiebedrijf. Reageer in het Nederlands. Blijf in karakter. Antwoorden max 2-3 zinnen.</textarea>
+            </div>
+            <div class="toggle-row">
+              <div><div class="toggle-label">Automatische feedback na sessie</div><div class="toggle-sub">AI geeft score + tips direct na het gesprek</div></div>
+              <div class="toggle on" id="tog-auto-feedback" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+              <div><div class="toggle-label">Voice standaard aan</div><div class="toggle-sub">TTS speelt automatisch af bij nieuw bericht</div></div>
+              <div class="toggle on" id="tog-voice" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+          <button class="save-btn" onclick="saveSettings('ai')">Opslaan</button>
+          <span class="save-confirm" id="sc-ai">✓ Opgeslagen</span>
+        </div>
+
+        <!-- Qualifiers -->
+        <div class="admin-panel" id="ap-qualifiers">
+          <div class="admin-panel-title">Kwalificatiecriteria</div>
+          <div class="settings-card">
+            <div class="settings-card-title">Wat telt als succesvolle kwalificatie?</div>
+            <div class="form-group">
+              <label class="form-label">Budget-vraag vereist</label>
+              <textarea class="form-textarea" id="q-budget" placeholder="Vraag naar het budget of investeringsbereidheid...">De beller vraagt expliciet naar budget, investeringsruimte of kosten-gevoeligheid van de prospect.</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Authority — beslisser geïdentificeerd</label>
+              <textarea class="form-textarea" id="q-authority">De beller verifieert of de persoon beslissingsbevoegdheid heeft, of vraagt wie er verder bij betrokken is.</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Need — pijn of behoefte benoemd</label>
+              <textarea class="form-textarea" id="q-need">De beller identificeert een concrete uitdaging of ambitie van de prospect rondom pipeline of nieuwe business.</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Timeline — urgentie vastgesteld</label>
+              <textarea class="form-textarea" id="q-timeline">De beller vraagt wanneer de prospect de situatie opgelost wil hebben of wanneer er ruimte is voor een gesprek.</textarea>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-title">Verboden onderwerpen (AI wijst af)</div>
+            <div class="form-group">
+              <label class="form-label">Voeg toe en druk Enter</label>
+              <input class="form-input" id="forbidden-input" placeholder="bijv. politiek, religie..." onkeydown="addTag(event,'forbidden-tags','forbidden-input')" />
+              <div class="tags-wrap" id="forbidden-tags">
+                <div class="tag">discriminatie<span class="tag-remove" onclick="this.parentElement.remove()">×</span></div>
+                <div class="tag">intimidatie<span class="tag-remove" onclick="this.parentElement.remove()">×</span></div>
+              </div>
+            </div>
+          </div>
+          <button class="save-btn" onclick="saveSettings('qualifiers')">Opslaan</button>
+          <span class="save-confirm" id="sc-qualifiers">✓ Opgeslagen</span>
+        </div>
+
+        <!-- Personas -->
+        <div class="admin-panel" id="ap-personas">
+          <div class="admin-panel-title">Persona's Beheren</div>
+          <div class="settings-card">
+            <div class="settings-card-title">Actieve Persona's</div>
+            <div id="persona-admin-list"></div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-title">Nieuwe Persona Toevoegen</div>
+            <div class="form-group"><label class="form-label">Naam</label><input class="form-input" id="new-p-name" placeholder="bijv. Jan de Vries" /></div>
+            <div class="form-group"><label class="form-label">Functietitel</label><input class="form-input" id="new-p-role" placeholder="bijv. Operations Director" /></div>
+            <div class="form-group">
+              <label class="form-label">Moeilijkheidsgraad</label>
+              <select class="form-select" id="new-p-diff">
+                <option value="EASY">Makkelijk</option>
+                <option value="MED">Gemiddeld</option>
+                <option value="HARD">Moeilijk</option>
+                <option value="REAL">Realistisch</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Karakter-prompt</label><textarea class="form-textarea" id="new-p-prompt" placeholder="Beschrijf hoe deze persona zich gedraagt..."></textarea></div>
+            <div class="form-group"><label class="form-label">Openingscitaat</label><input class="form-input" id="new-p-quote" placeholder="bijv. Tijd is geld." /></div>
+            <button class="save-btn" onclick="addPersona()">Persona toevoegen</button>
+          </div>
+        </div>
+
+        <!-- Scoring -->
+        <div class="admin-panel" id="ap-scoring">
+          <div class="admin-panel-title">Scoring Configuratie</div>
+          <div class="settings-card">
+            <div class="settings-card-title">Score gewichten (totaal = 10)</div>
+            <div class="form-group">
+              <label class="form-label">Opening kwaliteit <span class="range-val" id="rv-opening">2</span></label>
+              <div class="range-row"><input type="range" class="range-input" min="0" max="4" step="0.5" value="2" oninput="document.getElementById('rv-opening').textContent=this.value" /></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pijnpunten identificatie <span class="range-val" id="rv-pain">2</span></label>
+              <div class="range-row"><input type="range" class="range-input" min="0" max="4" step="0.5" value="2" oninput="document.getElementById('rv-pain').textContent=this.value" /></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bezwaar handling <span class="range-val" id="rv-obj">3</span></label>
+              <div class="range-row"><input type="range" class="range-input" min="0" max="4" step="0.5" value="3" oninput="document.getElementById('rv-obj').textContent=this.value" /></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Afsluiting kwaliteit <span class="range-val" id="rv-close">3</span></label>
+              <div class="range-row"><input type="range" class="range-input" min="0" max="4" step="0.5" value="3" oninput="document.getElementById('rv-close').textContent=this.value" /></div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-title">Puntensysteem</div>
+            <div class="form-group"><label class="form-label">Punten per sessie</label><input class="form-input" id="pts-session" type="number" value="1" /></div>
+            <div class="form-group"><label class="form-label">Bonus punten bij afspraak</label><input class="form-input" id="pts-meeting" type="number" value="5" /></div>
+            <div class="form-group"><label class="form-label">Bonus punten score ≥ 8</label><input class="form-input" id="pts-highscore" type="number" value="2" /></div>
+          </div>
+          <button class="save-btn" onclick="saveSettings('scoring')">Opslaan</button>
+          <span class="save-confirm" id="sc-scoring">✓ Opgeslagen</span>
+        </div>
+
+        <!-- Users -->
+        <div class="admin-panel" id="ap-users">
+          <div class="admin-panel-title">Gebruikersbeheer</div>
+          <div class="settings-card">
+            <div class="settings-card-title">Nieuwe gebruiker toevoegen</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">
+              <div><label class="form-label">Naam</label><input class="form-input" id="new-u-name" placeholder="Naam" /></div>
+              <div><label class="form-label">Wachtwoord</label><input class="form-input" type="password" id="new-u-pass" placeholder="Wachtwoord" /></div>
+              <div><label class="form-label">Rol</label>
+                <select class="form-select" id="new-u-role"><option value="user">Gebruiker</option><option value="admin">Admin</option></select>
+              </div>
+              <button class="save-btn" onclick="addUser()" style="height:38px;">Toevoegen</button>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-title">Alle gebruikers</div>
+            <table class="user-table">
+              <thead><tr><th>Naam</th><th>Rol</th><th>Sessies</th><th>Punten</th><th></th></tr></thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRACTICE OVERLAY -->
+<div class="practice-overlay" id="practice-overlay">
+  <div class="po-header">
+    <div class="po-av" id="po-av"></div>
+    <div>
+      <div class="po-name" id="po-name"></div>
+      <div class="po-detail" id="po-detail"></div>
+    </div>
+    <div class="po-right">
+      <div class="po-score-live">Score: <span id="po-score-live">—</span>/10</div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+      <button class="po-end" onclick="endPractice()">Beëindigen</button>
+    </div>
+  </div>
+
+  <div class="po-messages" id="po-messages"></div>
+
+  <div class="results-panel" id="results-panel">
+    <div class="rp-title">📊 Sessie Resultaten</div>
+    <div class="rp-scores" id="rp-scores"></div>
+    <div class="rp-body" id="rp-body"></div>
+  </div>
+
+  <div class="speaking-overlay" id="speaking-overlay">
+    <div class="wave on"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+    Prospect spreekt...
+  </div>
+
+  <div class="po-input-area">
+    <div class="voice-status">
+      <div class="wave" id="wave-anim"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+      <span class="vs-label" id="vs-label">Druk op 🎤 om te spreken</span>
+      <span class="vs-transcript" id="vs-transcript"></span>
+    </div>
+    <div class="po-row">
+      <textarea class="po-textarea" id="po-input" rows="1" placeholder="Of typ hier..." onkeydown="handleKey(event)"></textarea>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="1" width="6" height="9" rx="3"/><path d="M3 8a5 5 0 0 0 10 0" stroke-linecap="round"/><line x1="8" y1="13" x2="8" y2="15" stroke-linecap="round"/><line x1="5.5" y1="15" x2="10.5" y2="15" stroke-linecap="round"/></svg>
+      </button>
+      <button class="send-btn" id="send-btn" onclick="sendMsg()">
+        <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7.5h13M8 1.5l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="po-toolbar">
+      <button class="tool-btn gold-tool" onclick="getFeedback()">📊 Feedback</button>
+      <button class="tool-btn gold-tool" onclick="getTip()">💡 Tip</button>
+      <button class="tool-btn" onclick="replayLast()">🔊 Herspeel</button>
+      <button class="tool-btn" id="mute-btn" onclick="toggleMute()">🔇 Dempen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════ -->
+<script>
+// ═══ CONSTANTS ═══
+const PROXY_URL = 'https://JOUW-WORKER.workers.dev'; // ← vervang na Worker deploy
+
+// ═══ DEFAULT PERSONAS ═══
+const DEFAULT_PERSONAS = [
+  { id:'p1', name:'Linda V.', role:'Chief Commercial Officer', initials:'LV', bg:'#1c2a00', color:'#c8f060', diff:'MED', diffLabel:'MEDIUM', quote:'"Ik heb 2 minuten — maak het snel."', winRate:40, prompt:'Je bent Linda V., een drukke CCO. Direct, weinig tijd, kapt gesprekken af als ze te lang duren. Max 2 zinnen.', type:'main' },
+  { id:'p2', name:'Erik B.', role:'DGA & Oprichter', initials:'EB', bg:'#2a1800', color:'#f5a060', diff:'HARD', diffLabel:'HARD', quote:'"Overtuig me maar."', winRate:25, prompt:'Je bent Erik B., sceptische DGA. Wantrouwt externe bureaus, stelt kritische vragen.', type:'main' },
+  { id:'p3', name:'Sanne K.', role:'Head of Sales', initials:'SK', bg:'#001a0e', color:'#60e894', diff:'EASY', diffLabel:'EASY', quote:'"Vertel eens meer."', winRate:55, prompt:'Je bent Sanne K., Head of Sales bij een groeiende scale-up. Open en zoekt oplossingen. Stelt concrete vragen.', type:'main' },
+  { id:'p4', name:'Mark D.', role:'Inkoopdirecteur', initials:'MD', bg:'#1a0020', color:'#c084fc', diff:'HARD', diffLabel:'REALISTISCH', quote:'"Hoe heeft u mijn nummer?"', winRate:15, prompt:'Je bent Mark D., inkoopdirecteur die absoluut niet gebeld wil worden. Erg kortaf en wantrouwend.', type:'main' },
+  { id:'p5', name:'Tom H.', role:'CFO', initials:'TH', bg:'#001828', color:'#60c8fa', diff:'MED', diffLabel:'MEDIUM', quote:'"Wat zijn de kosten?"', winRate:35, prompt:'Je bent Tom H., een CFO die altijd focused op ROI en kosten. Vraagt altijd naar de investering voor iets anders.', type:'main' },
+  { id:'p6', name:'Petra M.', role:'Managing Director', initials:'PM', bg:'#280010', color:'#f060a8', diff:'HARD', diffLabel:'HARD', quote:'"We werken al met iemand."', winRate:20, prompt:'Je bent Petra M., MD die tevreden is met haar huidige leveranciers en weinig reden ziet om te wisselen.', type:'main' },
+  { id:'gk1', name:'Ans W.', role:'Senior Secretaresse', initials:'AW', bg:'#1a1a00', color:'#e8e060', diff:'GATE', diffLabel:'GATEKEEPER', quote:'"Waar gaat het over?"', winRate:42, prompt:'Je bent Ans W., een beschermende secretaresse die haar baas (DGA) afschermt van ongewenste bellers. Je verbindt niet snel door.', type:'gk' },
+];
+
+// ═══ STATE ═══
+let state = {
+  currentPage: 'dashboard',
+  isAdminLoggedIn: false,
+  currentUser: { name: 'Mats', role: 'user' },
+  conversation: [],
+  systemPrompt: '',
+  activePersona: null,
+  isRecording: false,
+  recognition: null,
+  isMuted: false,
+  lastSpeech: '',
+  isSpeaking: false,
+  sessions: [],
+  personas: [...DEFAULT_PERSONAS],
+  settings: {
+    apiKey: '',
+    proxyUrl: PROXY_URL,
+    model: 'claude-sonnet-4-20250514',
+    lang: 'nl',
+    systemPrefix: '',
+    autoFeedback: true,
+    voiceOn: true,
+  },
+  users: [
+    { name:'Mats', pass:'admin123', role:'admin', sessions:0, pts:0 },
+    { name:'Demo', pass:'demo', role:'user', sessions:0, pts:0 },
+  ],
+  adminCreds: null,
+};
+
+// Load from localStorage
+function loadState() {
+  try {
+    const saved = localStorage.getItem('hmm-state');
+    if (saved) {
+      const s = JSON.parse(saved);
+      if (s.sessions) state.sessions = s.sessions;
+      if (s.users) state.users = s.users;
+      if (s.settings) state.settings = { ...state.settings, ...s.settings };
+      if (s.personas) state.personas = s.personas;
+    }
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem('hmm-state', JSON.stringify({
+    sessions: state.sessions,
+    users: state.users,
+    settings: state.settings,
+    personas: state.personas,
+  }));
+}
+
+// ═══ NAVIGATION ═══
+function goTo(page) {
+  if (page === 'admin-gate') {
+    if (state.isAdminLoggedIn) { showPage('admin'); return; }
+    showPage('admin-gate'); return;
+  }
+  showPage(page);
+}
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  const el = document.getElementById('page-'+page);
+  if (el) el.classList.add('active');
+  const nl = document.getElementById('nl-'+(page==='admin'?'admin':page));
+  if (nl) nl.classList.add('active');
+  if (page==='admin-gate') document.getElementById('nl-admin').classList.add('active');
+  state.currentPage = page;
+  if (page === 'dashboard') refreshDashboard();
+  if (page === 'practice') renderPersonas();
+  if (page === 'admin') renderAdminUsers(); renderAdminPersonas();
+}
+
+// ═══ DASHBOARD ═══
+function refreshDashboard() {
+  const sessions = state.sessions;
+  const user = state.currentUser;
+
+  // Update username
+  document.getElementById('dash-username').textContent = user.name;
+
+  // Stats
+  const thisWeek = sessions.filter(s => {
+    const d = new Date(s.date);
+    const now = new Date();
+    const weekAgo = new Date(now - 7*24*60*60*1000);
+    return d > weekAgo;
+  });
+  document.getElementById('stat-week').innerHTML = `${thisWeek.length}<span class="stat-unit">sessies</span>`;
+
+  const meetings = sessions.filter(s => s.outcome === 'win').length;
+  document.getElementById('stat-meetings').innerHTML = `${meetings}<span class="stat-unit">geboekt</span>`;
+
+  const scores = sessions.map(s => s.score).filter(s => s > 0);
+  const best = scores.length ? Math.max(...scores) : null;
+  document.getElementById('stat-best').innerHTML = best ? `${best}<span class="stat-unit">/10</span>` : `—<span class="stat-unit">/10</span>`;
+
+  // Streak
+  let streak = 0;
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now()-86400000).toDateString();
+  const dates = [...new Set(sessions.map(s => new Date(s.date).toDateString()))];
+  if (dates.includes(today) || dates.includes(yesterday)) {
+    let check = dates.includes(today) ? new Date() : new Date(Date.now()-86400000);
+    while (true) {
+      if (dates.includes(check.toDateString())) { streak++; check = new Date(check - 86400000); }
+      else break;
+    }
+  }
+  document.getElementById('stat-streak').innerHTML = `${streak}<span class="stat-unit">dagen</span>`;
+
+  // Skill breakdown
+  if (sessions.length > 0) {
+    const skills = { 'Opening': 0, 'Pijnpunten': 0, 'Bezwaren': 0, 'Afsluiting': 0 };
+    const skillKeys = Object.keys(skills);
+    sessions.forEach(s => {
+      if (s.skillScores) skillKeys.forEach(k => { skills[k] += (s.skillScores[k] || 0); });
+    });
+    const skillHtml = skillKeys.map(k => {
+      const avg = sessions.length ? Math.round((skills[k]/sessions.length)*10) : 0;
+      return `<div class="skill-row">
+        <div class="skill-name">${k}</div>
+        <div class="skill-bar-wrap"><div class="skill-bar" style="width:${avg}%"></div></div>
+        <div class="skill-pct">${avg}%</div>
+      </div>`;
+    }).join('');
+    document.getElementById('skill-breakdown').innerHTML = skillHtml;
+  }
+
+  // Leaderboard
+  renderLeaderboard('week');
+
+  // Score trend
+  renderTrend();
+
+  // Recent sessions
+  if (sessions.length === 0) {
+    document.getElementById('recent-sessions').innerHTML = `<div class="empty-state"><div class="empty-icon">🎙️</div><div class="empty-label">Nog geen sessies. Start je eerste practice!</div></div>`;
+  } else {
+    const recent = sessions.slice(-8).reverse();
+    document.getElementById('recent-sessions').innerHTML = recent.map(s => {
+      const p = state.personas.find(p => p.id === s.personaId) || {};
+      const sc = s.score;
+      const cls = sc >= 7 ? 'score-high' : sc >= 5 ? 'score-mid' : 'score-low';
+      return `<div class="session-row">
+        <div class="session-av" style="background:${p.bg||'#222'};color:${p.color||'#aaa'}">${p.initials||'?'}</div>
+        <div class="session-info">
+          <div class="session-name">${p.name||'Onbekend'}</div>
+          <div class="session-meta">${p.role||''} · ${new Date(s.date).toLocaleDateString('nl-NL')}</div>
+        </div>
+        <div class="session-score ${cls}">${sc > 0 ? sc+'/10' : '—'}</div>
+        <div class="session-outcome ${s.outcome==='win'?'outcome-win':'outcome-loss'}">${s.outcome==='win'?'Afspraak':'Geen afspraak'}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function lbTab(period, el) {
+  document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderLeaderboard(period);
+}
+
+function renderLeaderboard(period) {
+  const sessions = state.sessions;
+  const now = new Date();
+  const filtered = sessions.filter(s => {
+    if (period === 'all') return true;
+    const d = new Date(s.date);
+    if (period === 'week') return (now-d) < 7*24*60*60*1000;
+    return (now-d) < 30*24*60*60*1000;
+  });
+
+  // Group by user
+  const scores = {};
+  filtered.forEach(s => {
+    if (!scores[s.user]) scores[s.user] = 0;
+    scores[s.user] += 1 + (s.outcome === 'win' ? 5 : 0) + (s.score >= 8 ? 2 : 0);
+  });
+
+  const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const body = document.getElementById('lb-body');
+  if (!sorted.length) { body.innerHTML = `<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-label">Nog geen data</div></div>`; return; }
+  body.innerHTML = sorted.slice(0,10).map(([name,pts],i) => {
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    return `<div class="lb-row"><div class="lb-rank ${rankClass}">${i+1}</div><div class="lb-name">${name}</div><div class="lb-pts">${pts} pts</div></div>`;
+  }).join('');
+}
+
+function renderTrend() {
+  const sessions = state.sessions.slice(-12);
+  const chart = document.getElementById('trend-chart');
+  if (!sessions.length) { chart.innerHTML = '<div class="trend-empty">Voltooi een sessie om je trend te zien</div>'; return; }
+
+  const scores = sessions.map(s => s.score || 0);
+  const max = 10;
+  const h = 110, w = 600;
+  const step = w / Math.max(scores.length-1,1);
+
+  const points = scores.map((s,i) => `${i*step},${h - (s/max)*h}`).join(' ');
+  const area = `${points} ${(scores.length-1)*step},${h} 0,${h}`;
+
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h+10}" style="width:100%;height:100%;" preserveAspectRatio="none">
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f0c040" stop-opacity="0.3"/><stop offset="100%" stop-color="#f0c040" stop-opacity="0.02"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#tg)"/>
+    <polyline points="${points}" fill="none" stroke="#f0c040" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${scores.map((s,i) => `<circle cx="${i*step}" cy="${h-(s/max)*h}" r="3" fill="#f0c040"/>`).join('')}
+  </svg>`;
+}
+
+// ═══ PRACTICE ═══
+function renderPersonas() {
+  const grid = document.getElementById('persona-grid');
+  const gk = document.getElementById('gk-grid');
+  const main = state.personas.filter(p => p.type !== 'gk');
+  const gatekeepers = state.personas.filter(p => p.type === 'gk');
+
+  grid.innerHTML = main.map(p => personaCardHtml(p)).join('');
+  gk.innerHTML = gatekeepers.map(p => personaCardHtml(p)).join('');
+}
+
+function personaCardHtml(p) {
+  const diffClass = { EASY:'diff-easy', MED:'diff-med', HARD:'diff-hard', REAL:'diff-real', GATE:'diff-gate' }[p.diff] || 'diff-med';
+  return `<div class="persona-card" onclick="startPractice('${p.id}')">
+    <div class="pc-top">
+      <div class="pc-avatar" style="background:${p.bg};color:${p.color};">${p.initials}</div>
+      <div class="pc-info"><div class="pc-name">${p.name}</div><div class="pc-role">${p.role}</div></div>
+    </div>
+    <div class="pc-quote">${p.quote}</div>
+    <div class="pc-footer">
+      <div class="pc-diff ${diffClass}">${p.diffLabel}</div>
+      <div class="pc-win">${p.winRate}% win</div>
+    </div>
+  </div>`;
+}
+
+function skipICP() { document.getElementById('icp-banner').style.display='none'; }
+
+async function scanICP() {
+  const url = document.getElementById('icp-url').value.trim();
+  if (!url) return;
+  document.getElementById('icp-banner').querySelector('.btn-scan').textContent = '⏳ Bezig...';
+  setTimeout(() => { document.getElementById('icp-banner').style.display='none'; }, 1500);
+}
+
+function startPractice(personaId) {
+  const p = state.personas.find(x => x.id === personaId);
+  if (!p) return;
+  state.activePersona = p;
+  state.conversation = [];
+
+  const apiKey = state.settings.apiKey;
+  const proxy = state.settings.proxyUrl;
+  if (!apiKey && !proxy.includes('workers.dev')) {
+    alert('Voeg eerst een API-sleutel in via Admin → AI Instellingen.');
+    return;
+  }
+
+  // Build system prompt
+  const qualSettings = JSON.parse(localStorage.getItem('hmm-qualifiers') || '{}');
+  const budget = qualSettings.budget || 'De beller vraagt naar budget.';
+  const authority = qualSettings.authority || 'De beller verifieert beslissingsbevoegdheid.';
+  const need = qualSettings.need || 'De beller identificeert een concrete uitdaging.';
+  const timeline = qualSettings.timeline || 'De beller vraagt naar timing.';
+
+  const scoringConfig = JSON.parse(localStorage.getItem('hmm-scoring') || '{}');
+
+  state.systemPrompt = `${state.settings.systemPrefix || 'Je bent een realistische B2B-prospect in een cold call training voor HMM, een outbound leadgeneratiebedrijf.'}
+${p.prompt}
+Reageer altijd in het Nederlands. Blijf volledig in karakter. Max 2-3 zinnen per antwoord.
+
+KWALIFICATIECRITERIA (let op of de beller dit doet):
+- Budget: ${budget}
+- Authority: ${authority}
+- Need: ${need}
+- Timeline: ${timeline}
+
+Geef NOOIT zelf feedback tenzij het bericht [FEEDBACK], [TIP], of [SCORE] bevat.
+Als [FEEDBACK]: verlaat karakter en geef uitgebreide feedback (✓ goed, → verbetering, concrete tips). Score ook op: Opening (0-${scoringConfig.opening||2}), Pijnpunten (0-${scoringConfig.pain||2}), Bezwaren (0-${scoringConfig.obj||3}), Afsluiting (0-${scoringConfig.close||3}). Totaal /10.
+Als [TIP]: geef 1 concrete tip voor de volgende zin.
+Als [SCORE]: geef ALLEEN een JSON: {"score":X,"opening":X,"pain":X,"obj":X,"close":X,"outcome":"win"|"loss","feedback":"..."} geen tekst eromheen.`;
+
+  // Setup overlay
+  const overlay = document.getElementById('practice-overlay');
+  document.getElementById('po-av').textContent = p.initials;
+  document.getElementById('po-av').style.background = p.bg;
+  document.getElementById('po-av').style.color = p.color;
+  document.getElementById('po-name').textContent = p.name + ' · ' + p.role;
+  document.getElementById('po-detail').textContent = p.diffLabel + ' · ' + p.winRate + '% win rate';
+  document.getElementById('po-messages').innerHTML = '';
+  document.getElementById('results-panel').classList.remove('on');
+  document.getElementById('po-score-live').textContent = '—';
+  overlay.classList.add('open');
+
+  addSys('📞 Gesprek gestart — jij belt. Druk op 🎤 of typ je openingszin.');
+  state.conversation.push({ role:'user', content:'[START — neem kort de telefoon op als prospect.]' });
+  callAI();
+}
+
+function endPractice() {
+  stopMic();
+  window.speechSynthesis.cancel();
+  // Auto-score
+  if (state.conversation.length > 3) scoreSession();
+  else {
+    document.getElementById('practice-overlay').classList.remove('open');
+  }
+}
+
+async function scoreSession() {
+  try {
+    const msgs = [...state.conversation, { role:'user', content:'[SCORE]' }];
+    const res = await apiCall(msgs);
+    const text = res.content?.[0]?.text || '{}';
+    let data;
+    try { data = JSON.parse(text.replace(/```json|```/g,'')); } catch(e) { data = {}; }
+
+    const p = state.activePersona;
+    const session = {
+      personaId: p.id,
+      date: new Date().toISOString(),
+      score: data.score || 0,
+      outcome: data.outcome || 'loss',
+      skillScores: { Opening: data.opening||0, Pijnpunten: data.pain||0, Bezwaren: data.obj||0, Afsluiting: data.close||0 },
+      feedback: data.feedback || '',
+      user: state.currentUser.name,
+    };
+    state.sessions.push(session);
+    saveState();
+
+    // Update user pts
+    const u = state.users.find(x => x.name === state.currentUser.name);
+    if (u) { u.sessions++; u.pts += 1 + (session.outcome==='win'?5:0) + (session.score>=8?2:0); saveState(); }
+
+    // Show results
+    document.getElementById('po-score-live').textContent = data.score || 0;
+    const rp = document.getElementById('results-panel');
+    document.getElementById('rp-scores').innerHTML = [
+      ['Totaal', `${data.score||0}/10`],
+      ['Opening', `${data.opening||0}`],
+      ['Bezwaren', `${data.obj||0}`],
+      ['Afsluiting', `${data.close||0}`],
+    ].map(([l,v]) => `<div class="rp-score"><div class="rp-score-val">${v}</div><div class="rp-score-label">${l}</div></div>`).join('');
+    document.getElementById('rp-body').textContent = data.feedback || '';
+    rp.classList.add('on');
+    rp.scrollIntoView({ behavior:'smooth' });
+
+    // Close after delay
+    setTimeout(() => {
+      document.getElementById('practice-overlay').classList.remove('open');
+    }, 500);
+  } catch(e) {
+    document.getElementById('practice-overlay').classList.remove('open');
+  }
+}
+
+// ═══ CHAT HELPERS ═══
+function addSys(txt) {
+  const el = document.createElement('div'); el.className='sys-msg'; el.textContent=txt;
+  document.getElementById('po-messages').appendChild(el); scrollMsgs();
+}
+
+function addBubble(txt, isUser) {
+  const p = state.activePersona;
+  const wrap = document.createElement('div'); wrap.className='msg '+(isUser?'user':'ai');
+  if (isUser) wrap.innerHTML=`<div class="m-av user-av">JIJ</div><div class="bubble">${esc(txt)}</div>`;
+  else wrap.innerHTML=`<div class="m-av" style="background:${p.bg};color:${p.color};">${p.initials}</div><div class="bubble">${esc(txt)}</div>`;
+  document.getElementById('po-messages').appendChild(wrap); scrollMsgs();
+}
+
+function showTyping(show) {
+  let row = document.getElementById('typing-row');
+  if (!row) {
+    const p = state.activePersona; row=document.createElement('div'); row.id='typing-row'; row.className='typing-wrap';
+    row.innerHTML=`<div class="m-av" style="background:${p.bg};color:${p.color};">${p.initials}</div><div class="typing-bubbles"><span></span><span></span><span></span></div>`;
+    document.getElementById('po-messages').appendChild(row);
+  }
+  row.classList.toggle('on',show); if(show)scrollMsgs();
+}
+
+function scrollMsgs() { const m=document.getElementById('po-messages'); m.scrollTop=m.scrollHeight; }
+function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+// ═══ API ═══
+async function apiCall(messages) {
+  const apiKey = state.settings.apiKey;
+  const proxyUrl = state.settings.proxyUrl;
+  const model = state.settings.model || 'claude-sonnet-4-20250514';
+
+  const useProxy = proxyUrl && !proxyUrl.includes('JOUW-WORKER');
+  const url = useProxy ? proxyUrl : 'https://api.anthropic.com/v1/messages';
+
+  const headers = { 'Content-Type':'application/json' };
+  if (!useProxy) {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
+
+  const res = await fetch(url, {
+    method:'POST', headers,
+    body: JSON.stringify({ model, max_tokens:800, system: state.systemPrompt, messages })
+  });
+  return await res.json();
+}
+
+async function callAI(extraMsg) {
+  const msgs = extraMsg ? [...state.conversation,{role:'user',content:extraMsg}] : state.conversation;
+  showTyping(true);
+  document.getElementById('send-btn').disabled=true;
+  try {
+    const data = await apiCall(msgs);
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content?.[0]?.text || '...';
+    showTyping(false);
+    if (!extraMsg) {
+      state.conversation.push({role:'assistant',content:reply});
+      addBubble(reply,false);
+      if (!state.isMuted) speak(reply);
+    } else {
+      if (extraMsg.includes('[SCORE]')) return data;
+      showResults(reply);
+    }
+  } catch(e) {
+    showTyping(false);
+    addSys('⚠ Fout: '+e.message+'. Controleer je API-sleutel in Admin → AI Instellingen.');
+  }
+  document.getElementById('send-btn').disabled=false;
+}
+
+function showResults(text) {
+  const rp = document.getElementById('results-panel');
+  document.getElementById('rp-body').textContent = text;
+  document.getElementById('rp-scores').innerHTML = '';
+  rp.classList.add('on');
+  rp.scrollIntoView({behavior:'smooth'});
+}
+
+function sendUserMsg(text) {
+  if (!text.trim()) return;
+  addBubble(text,true);
+  state.conversation.push({role:'user',content:text});
+  callAI();
+}
+
+function sendMsg() {
+  const ta=document.getElementById('po-input'); const t=ta.value.trim();
+  if(!t)return; ta.value=''; ta.style.height='auto'; sendUserMsg(t);
+}
+
+function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+
+async function getFeedback() {
+  document.getElementById('results-panel').classList.remove('on');
+  addSys('📊 Feedback wordt opgehaald...');
+  await callAI('[FEEDBACK] Analyseer het gesprek en geef uitgebreide trainerfeedback.');
+}
+
+async function getTip() {
+  await callAI('[TIP] Geef 1 korte concrete tip voor mijn volgende zin.');
+}
+
+// ═══ VOICE ═══
+function toggleMic() { if(state.isRecording)stopMic();else startMic(); }
+
+function startMic() {
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){addSys('⚠ Spraakherkenning niet beschikbaar. Gebruik Chrome of Edge.');return;}
+  if(state.isSpeaking){window.speechSynthesis.cancel();state.isSpeaking=false;}
+  state.recognition=new SR(); state.recognition.lang='nl-NL'; state.recognition.interimResults=true; state.recognition.continuous=false;
+  state.recognition.onstart=()=>{state.isRecording=true;document.getElementById('mic-btn').classList.add('recording');document.getElementById('wave-anim').classList.add('on');document.getElementById('vs-label').textContent='Luisteren...';document.getElementById('vs-transcript').textContent='';};
+  state.recognition.onresult=(e)=>{let interim='',final='';for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)final+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}document.getElementById('vs-transcript').textContent=final||interim;if(final)document.getElementById('po-input').value=final;};
+  state.recognition.onend=()=>{state.isRecording=false;document.getElementById('mic-btn').classList.remove('recording');document.getElementById('wave-anim').classList.remove('on');document.getElementById('vs-label').textContent='Druk op 🎤 om te spreken';const t=document.getElementById('po-input').value.trim();if(t){sendUserMsg(t);document.getElementById('po-input').value='';document.getElementById('vs-transcript').textContent='';}};
+  state.recognition.onerror=(e)=>{state.isRecording=false;document.getElementById('mic-btn').classList.remove('recording');document.getElementById('wave-anim').classList.remove('on');if(e.error!=='no-speech')addSys('⚠ Microfoon: '+e.error);document.getElementById('vs-label').textContent='Druk op 🎤 om te spreken';};
+  state.recognition.start();
+}
+
+function stopMic(){if(state.recognition){try{state.recognition.stop();}catch(e){}}state.isRecording=false;document.getElementById('mic-btn').classList.remove('recording');document.getElementById('wave-anim').classList.remove('on');}
+
+function speak(text) {
+  if(state.isMuted||!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  const p=state.activePersona; const utt=new SpeechSynthesisUtterance(text);
+  utt.lang='nl-NL'; utt.pitch=1.0; utt.rate=1.05; utt.volume=1;
+  const voices=window.speechSynthesis.getVoices();
+  const nlVoice=voices.find(v=>v.lang.startsWith('nl'));
+  if(nlVoice)utt.voice=nlVoice;
+  utt.onstart=()=>{state.isSpeaking=true;state.lastSpeech=text;document.getElementById('speaking-overlay').classList.add('on');};
+  utt.onend=utt.onerror=()=>{state.isSpeaking=false;document.getElementById('speaking-overlay').classList.remove('on');};
+  window.speechSynthesis.speak(utt);
+}
+
+function replayLast(){if(state.lastSpeech)speak(state.lastSpeech);else addSys('Geen vorig antwoord.');}
+function toggleMute(){state.isMuted=!state.isMuted;if(state.isMuted){window.speechSynthesis.cancel();state.isSpeaking=false;document.getElementById('speaking-overlay').classList.remove('on');}document.getElementById('mute-btn').textContent=state.isMuted?'🔔 Geluid aan':'🔇 Dempen';}
+
+// ═══ COACH NAV ═══
+function coachNav(id, el) {
+  document.querySelectorAll('.coach-nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.coach-section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('cs-'+id).classList.add('active');
+}
+
+// ═══ ADMIN ═══
+function doLogin() {
+  const name = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const user = state.users.find(u => u.name === name && u.pass === pass && u.role === 'admin');
+  if (user) {
+    state.isAdminLoggedIn = true;
+    state.adminCreds = { name, pass };
+    showPage('admin');
+    renderAdminUsers(); renderAdminPersonas();
+    loadAdminSettings();
+  } else {
+    document.getElementById('login-err').classList.add('on');
+    setTimeout(()=>document.getElementById('login-err').classList.remove('on'),3000);
+  }
+}
+
+function adminLogout() {
+  state.isAdminLoggedIn = false;
+  showPage('admin-gate');
+}
+
+function adminNav(id, el) {
+  document.querySelectorAll('.admin-nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ap-'+id).classList.add('active');
+}
+
+function loadAdminSettings() {
+  document.getElementById('ai-apikey').value = state.settings.apiKey || '';
+  document.getElementById('ai-proxy').value = state.settings.proxyUrl || '';
+  document.getElementById('ai-model').value = state.settings.model || 'claude-sonnet-4-20250514';
+  document.getElementById('ai-lang').value = state.settings.lang || 'nl';
+  document.getElementById('ai-system').value = state.settings.systemPrefix || '';
+  if(state.settings.autoFeedback===false) document.getElementById('tog-auto-feedback').classList.remove('on');
+  if(state.settings.voiceOn===false) document.getElementById('tog-voice').classList.remove('on');
+
+  const qs = JSON.parse(localStorage.getItem('hmm-qualifiers')||'{}');
+  if(qs.budget) document.getElementById('q-budget').value=qs.budget;
+  if(qs.authority) document.getElementById('q-authority').value=qs.authority;
+  if(qs.need) document.getElementById('q-need').value=qs.need;
+  if(qs.timeline) document.getElementById('q-timeline').value=qs.timeline;
+}
+
+function saveSettings(type) {
+  if (type === 'ai') {
+    state.settings.apiKey = document.getElementById('ai-apikey').value.trim();
+    state.settings.proxyUrl = document.getElementById('ai-proxy').value.trim() || PROXY_URL;
+    state.settings.model = document.getElementById('ai-model').value;
+    state.settings.lang = document.getElementById('ai-lang').value;
+    state.settings.systemPrefix = document.getElementById('ai-system').value;
+    state.settings.autoFeedback = document.getElementById('tog-auto-feedback').classList.contains('on');
+    state.settings.voiceOn = document.getElementById('tog-voice').classList.contains('on');
+  }
+  if (type === 'qualifiers') {
+    localStorage.setItem('hmm-qualifiers', JSON.stringify({
+      budget: document.getElementById('q-budget').value,
+      authority: document.getElementById('q-authority').value,
+      need: document.getElementById('q-need').value,
+      timeline: document.getElementById('q-timeline').value,
+    }));
+  }
+  if (type === 'scoring') {
+    localStorage.setItem('hmm-scoring', JSON.stringify({
+      opening: parseFloat(document.getElementById('rv-opening').textContent),
+      pain: parseFloat(document.getElementById('rv-pain').textContent),
+      obj: parseFloat(document.getElementById('rv-obj').textContent),
+      close: parseFloat(document.getElementById('rv-close').textContent),
+      ptsSession: parseInt(document.getElementById('pts-session').value),
+      ptsMeeting: parseInt(document.getElementById('pts-meeting').value),
+      ptsHigh: parseInt(document.getElementById('pts-highscore').value),
+    }));
+  }
+  saveState();
+  const el = document.getElementById('sc-'+type);
+  if(el){el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2000);}
+}
+
+function addTag(e, listId, inputId) {
+  if (e.key !== 'Enter') return;
+  const val = document.getElementById(inputId).value.trim();
+  if (!val) return;
+  const tag = document.createElement('div'); tag.className='tag';
+  tag.innerHTML=`${val}<span class="tag-remove" onclick="this.parentElement.remove()">×</span>`;
+  document.getElementById(listId).appendChild(tag);
+  document.getElementById(inputId).value='';
+}
+
+function renderAdminUsers() {
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = state.users.map((u,i) => `<tr>
+    <td>${u.name}</td>
+    <td><span class="user-badge ${u.role==='admin'?'badge-admin':'badge-user'}">${u.role}</span></td>
+    <td>${u.sessions||0}</td>
+    <td>${u.pts||0}</td>
+    <td><button onclick="removeUser(${i})" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:12px;">verwijder</button></td>
+  </tr>`).join('');
+}
+
+function addUser() {
+  const name=document.getElementById('new-u-name').value.trim();
+  const pass=document.getElementById('new-u-pass').value;
+  const role=document.getElementById('new-u-role').value;
+  if(!name||!pass){alert('Vul naam en wachtwoord in.');return;}
+  state.users.push({name,pass,role,sessions:0,pts:0});
+  saveState(); renderAdminUsers();
+  document.getElementById('new-u-name').value='';
+  document.getElementById('new-u-pass').value='';
+}
+
+function removeUser(i) {
+  if(!confirm('Gebruiker verwijderen?'))return;
+  state.users.splice(i,1); saveState(); renderAdminUsers();
+}
+
+function renderAdminPersonas() {
+  const list=document.getElementById('persona-admin-list');
+  if(!list)return;
+  list.innerHTML=state.personas.map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+    <div style="width:30px;height:30px;border-radius:50%;background:${p.bg};color:${p.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;">${p.initials}</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:500;">${p.name}</div><div style="font-size:11px;color:var(--text3);">${p.role} · ${p.diffLabel}</div></div>
+    <button onclick="removePersona(${i})" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:12px;">verwijder</button>
+  </div>`).join('');
+}
+
+function addPersona() {
+  const name=document.getElementById('new-p-name').value.trim();
+  const role=document.getElementById('new-p-role').value.trim();
+  const diff=document.getElementById('new-p-diff').value;
+  const prompt=document.getElementById('new-p-prompt').value.trim();
+  const quote=document.getElementById('new-p-quote').value.trim();
+  if(!name||!role||!prompt){alert('Vul naam, rol en prompt in.');return;}
+  const initials=(name.split(' ').map(w=>w[0]).join('').toUpperCase()).slice(0,2);
+  const colors={EASY:['#001a0e','#60e894'],MED:['#1c2a00','#c8f060'],HARD:['#2a0a00','#f08060'],REAL:['#001828','#60c8fa'],GATE:['#1a1a00','#e8e060']};
+  const [bg,color]=colors[diff]||colors.MED;
+  const diffLabels={EASY:'EASY',MED:'MEDIUM',HARD:'HARD',REAL:'REALISTISCH',GATE:'GATEKEEPER'};
+  state.personas.push({id:'p'+Date.now(),name,role,initials,bg,color,diff,diffLabel:diffLabels[diff],quote:`"${quote||'...'}"`,winRate:30,prompt,type:diff==='GATE'?'gk':'main'});
+  saveState(); renderAdminPersonas();
+  ['new-p-name','new-p-role','new-p-prompt','new-p-quote'].forEach(id=>document.getElementById(id).value='');
+}
+
+function removePersona(i) {
+  if(!confirm('Persona verwijderen?'))return;
+  state.personas.splice(i,1); saveState(); renderAdminPersonas();
+}
+
+// ═══ INIT ═══
+loadState();
+refreshDashboard();
+renderPersonas();
+window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+document.getElementById('po-input').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';});
+</script>
+</body>
+</html>
